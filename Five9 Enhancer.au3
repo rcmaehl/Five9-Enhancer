@@ -29,7 +29,7 @@ Global Const $CTRL_ALL = 0
 Global Const $CTRL_CREATED = 1
 Global Const $ABM_GETTASKBARPOS = 0x5
 
-Global Enum $hRemindMe, $hCustomLess, $honStartup
+Global Enum $hFrontCalls, $hRemindMe, $hCustomLess, $honStartup
 
 $oMyError = ObjEvent("AutoIt.Error","_ThrowError") ; Initialize a COM error handler
 
@@ -43,22 +43,24 @@ Func Main()
 
 	Local $hGUI = GUICreate("Settings", 280, 100, @DesktopWidth - 300, @DesktopHeight - 180, BitXOR($GUI_SS_DEFAULT_GUI, $WS_MINIMIZEBOX), $WS_EX_TOOLWINDOW + $WS_EX_TOPMOST)
 
-	Local $aControls[3]
+	Local $aControls[4]
 
-	$aControls[$hRemindMe  ] = GUICtrlCreateCheckbox("Show Reminders for Non-Ready Status", 10, 00, 260, 20, $BS_RIGHTBUTTON)
-	$aControls[$hCustomLess] = GUICtrlCreateCheckbox("Enable Custom Reminders"            , 10, 20, 260, 20, $BS_RIGHTBUTTON)
-	$aControls[$honStartup]  = GUICtrlCreateCheckbox("Start with Windows"                 , 10, 40, 260, 20, $BS_RIGHTBUTTON)
+	$aControls[$hFrontCalls] = GUICtrlCreateCheckbox("Bring Five9 to Front on Incoming Call", 10, 00, 260, 20, $BS_RIGHTBUTTON)
+	$aControls[$hRemindMe  ] = GUICtrlCreateCheckbox("Show Reminders for Non-Ready Status"  , 10, 20, 260, 20, $BS_RIGHTBUTTON)
+	$aControls[$hCustomLess] = GUICtrlCreateCheckbox("Enable Custom Reminders"              , 10, 40, 260, 20, $BS_RIGHTBUTTON)
+	$aControls[$honStartup]  = GUICtrlCreateCheckbox("Start with Windows"                   , 10, 60, 260, 20, $BS_RIGHTBUTTON)
 
 	GUICtrlSetTip($aControls[$hRemindMe], "Display 15 minute, 30 minute, & 1 hour reminders for Not Ready")
-	GUICtrlSetTip($aControls[$hCustomLess], "Use 1 minute reminders for SD Tasks")
+	GUICtrlSetTip($aControls[$hCustomLess], "Use custom settings filed defined reminders")
 
 	$aSettings = _LoadSettings()
 ;	_ArrayDisplay($aSettings)
+	GUICtrlSetState($aControls[$hFrontCalls], $aSettings[$hFrontCalls])
 	GUICtrlSetState($aControls[$hRemindMe  ], $aSettings[$hRemindMe  ])
 	GUICtrlSetState($aControls[$hCustomLess], $aSettings[$hCustomLess])
 	GUICtrlSetState($aControls[$honStartup] , $aSettings[$honStartup] )
 
-	Global $aAPI = StringSplit($aSettings[3], ",")
+	Global $aAPI = StringSplit($aSettings[4], ",")
 	If @error And Not $bDebug Then
 		$aAPI = MsgBox($MB_OK + $MB_ICONWARNING + $MB_TOPMOST, "ALERT", "Five9 API  was not specified" & @CRLF & "Five9 Enhancer will now exit", 30)
 		Exit 1
@@ -68,9 +70,9 @@ Func Main()
 
 ;	_ArrayDisplay($aAPI)
 
-	Local $iPoll = Number($aSettings[4])
-	Local $iUser = $aSettings[5]
-	Local $iPass = $aSettings[6]
+	Local $iPoll = Number($aSettings[5])
+	Local $iUser = $aSettings[6]
+	Local $iPass = $aSettings[7]
 
 	Local $sStatus = Null
 
@@ -126,7 +128,8 @@ Func Main()
 						GUISetState(@SW_HIDE, $hGUI)
 
 
-					Case $aControls[$hRemindMe] To $aControls[$honStartup]
+					Case $aControls[$hFrontCalls] To $aControls[$honStartup]
+						If _IsChecked($aControls[$hRemindMe ]) Then TraySetToolTip("Running...")
 						If _IsChecked($aControls[$hOnStartup]) And Not FileExists(@StartupDir & "\Five9 Enhancer.lnk") Then
 							FileCreateShortcut(@AutoItExe, @StartupDir & "\Five9 Enhancer.lnk")
 						ElseIf Not _IsChecked($aControls[$honStartup]) And FileExists(@StartupDir & "\Five9 Enhancer.lnk") Then
@@ -144,8 +147,6 @@ Func Main()
 			ContinueLoop
 		EndIf
 
-		TraySetToolTip("Running...")
-
 			If TimerDiff($hLastPoll) >= $iPoll Then ; Rate Limiting is important
 				$iPoll = 500
 				$hLastPoll = TimerInit()
@@ -160,6 +161,55 @@ Func Main()
 
 		$bCLock = _GetDesktopLock()
 
+		If _IsChecked($aControls[$hFrontCalls]) Then
+			; Do notification logic here
+		EndIf
+
+		Select
+
+			Case Not IsArray($sStatus) ; Not Ready
+				If Not $bTimer Then
+					$bTimer = True
+					$hNRTimer = TimerInit()
+				ElseIf TimerDiff($hNRTimer) >= 900000 Then
+					$iNRC += 1
+					If $iNRC = 3 Or $iNRC = 6 Or $iNRC = 7 Then
+						;;;
+					Else
+						WinMinimizeAll()
+						$hMsgBox = MsgBox($MB_YESNO + $MB_ICONWARNING + $MB_TOPMOST, "Reminder", "You've been in Not Ready Status for over " & $iNRC * 15 & " minutes. Would you like to go back to Ready Status?", 15)
+						If $hMsgBox = $IDYES Then
+							_Five9AgentSetState($aAPI[$aAPI[0]], "CALL", "", $iUser, $iPass)
+						EndIf
+						WinMinimizeAllUndo()
+						$hMsgBox = Null
+					EndIf
+
+					$hNRTimer = TimerInit()
+				EndIf
+
+				If $bCLock = True Then ; If Desktop is locked
+					$bLLock = True
+					$CLock = Null
+				ElseIf $bCLock = False And $bLLock = True Then ; If Desktop is unlocked but WAS locked
+					$bLLock = False
+					$bCLock = True
+					$hMsgBox = MsgBox($MB_YESNO + $MB_ICONWARNING + $MB_TOPMOST, "Reminder", "You've just logged back in while Not Ready. You've been Not Ready for " & ($iNRC * 15) + Floor(TimerDiff($hNRTimer) / 60000) & " minutes. Would you like to go back to Ready Status?", 30)
+					If $hMsgBox = $IDYES Then
+						_Five9AgentSetState($aAPI[$aAPI[0]], "CALL", "", $iUser, $iPass)
+					EndIf
+					$hMsgBox = Null
+				Else
+					$bLLock = $bCLock
+					$CLock = Null
+				EndIf
+
+			Case IsArray($sStatus) ; Ready
+				$iNRC = 0
+				$bTimer = False
+				$hNRTimer = TimerInit()
+
+		EndSelect
 #cs
 		Switch $sStatus
 
@@ -309,10 +359,11 @@ EndFunc   ;==>_GetTaskBarPos
 
 Func _LoadSettings()
 	_UpdateSettings(IniRead(".\Five9E.ini", "#Meta", "FileVer", "0.0.0.0"))
-	Local $aSettings[7]
-	$aSettings[$hRemindMe  ] = _IniRead(".\Five9E.ini", "Five9E", "Monitor Status"       , "1|0", $GUI_UNCHECKED)
-	$aSettings[$hCustomLess] = _IniRead(".\Five9E.ini", "Five9E", "Use Custom Reminders" , "1|0", $GUI_UNCHECKED)
-	$aSettings[$honStartup]  = _IniRead(".\Five9E.ini", "Five9E", "Start with Windows"   , "1|0", $GUI_UNCHECKED)
+	Local $aSettings[8]
+	$aSettings[$hFrontCalls] = _IniRead(".\Five9E.ini", "Five9E", "Bring Calls to Front", "1|0", $GUI_UNCHECKED)
+	$aSettings[$hRemindMe  ] = _IniRead(".\Five9E.ini", "Five9E", "Monitor Status"      , "1|0", $GUI_UNCHECKED)
+	$aSettings[$hCustomLess] = _IniRead(".\Five9E.ini", "Five9E", "Use Custom Reminders", "1|0", $GUI_UNCHECKED)
+	$aSettings[$honStartup]  = _IniRead(".\Five9E.ini", "Five9E", "Start with Windows"  , "1|0", $GUI_UNCHECKED)
 	$aSettings[3] = _IniRead(".\Five9E.ini", "Five9 API", "API URLs"     , ""   , False)
 	$aSettings[4] = _IniRead(".\Five9E.ini", "Five9 API", "API Poll Rate", ""   , 500  )
 	$aSettings[5] = _IniRead(".\Five9E.ini", "Five9 API", "User ID"      , ""   , False)
@@ -322,6 +373,7 @@ EndFunc   ;==>_LoadSettings
 
 Func _SaveSettings($aSettings)
  	IniWrite(".\Five9E.ini", "#Meta"  , "FileVer"            , $sVer)
+	IniWrite(".\Five9E.ini", "Five9E" , "Bring Calls to Front", _IsChecked($aSettings[$hFrontCalls]))
 	IniWrite(".\Five9E.ini", "Five9E" , "Monitor Status"      , _IsChecked($aSettings[$hRemindMe]  ))
 	IniWrite(".\Five9E.ini", "Five9E" , "Use Custom Reminders", _IsChecked($aSettings[$hCustomLess]))
 	IniWrite(".\Five9E.ini", "Five9E" , "Start with Windows"  , _IsChecked($aSettings[$hOnStartup] ))
