@@ -267,7 +267,7 @@ EndFunc
 ;                  |500 - Internal Server Error (Five9)
 ;                  |503 - Service Unavailable (Five9)
 ; Author ........: Robert Maehl
-; Modified ......: 3/16/2021
+; Modified ......: 3/21/2021
 ; Remarks .......:
 ; Related .......:
 ; Link ..........:
@@ -295,7 +295,7 @@ Func _Five9Logout($sAPI, $sUser, $sPassword)
 ;	$oHTTP.Send("<User><state>LOGOUT</state></User>")
 ;	If @error Then Return SetError(2, 0, 0)
 
-	If $oHTTP.Status <> $FINESSE_STATUS_ACCEPTED Then Return SetError($oHTTP.Status, 0, $oHTTP.ResponseText)
+	If $oHTTP.Status <> $FIVE9_STATUS_SUCCESS Then Return SetError($oHTTP.Status, 0, $oHTTP.ResponseText)
 
 	Return SetError(0, 0, True)
 
