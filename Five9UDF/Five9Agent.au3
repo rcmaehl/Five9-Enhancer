@@ -44,7 +44,7 @@ Func _Five9AgentGetPresence($sAPI, $sUser, $sPassword)
 
 	Return SetError(0, 0, $sState)
 
-EndFunc
+EndFunc   ;==>_Five9AgentGetPresence
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _Five9AgentGetChannels
@@ -98,7 +98,7 @@ Func _Five9AgentGetChannels($sAPI, $sUser, $sPassword)
 
 	Return SetError(0, 0, $sChannels)
 
-EndFunc
+EndFunc   ;==>_Five9AgentGetChannels
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _Five9AgentSetChannels
@@ -160,7 +160,7 @@ Func _Five9AgentSetChannels($sAPI, $sChannels, $iReason, $sUser, $sPassword)
 
 	Return SetError(0, 0, True)
 
-EndFunc
+EndFunc   ;==>_Five9AgentSetChannels
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _Five9GetAgent
@@ -203,7 +203,7 @@ Func _Five9GetAgent($sAPI, $sUser, $sPassword)
 
 	Return SetError(0, 0, $oHTTP.ResponseText)
 
-EndFunc
+EndFunc   ;==>_Five9GetAgent
 
 
 ; #FUNCTION# ====================================================================================================================
@@ -234,7 +234,7 @@ Func _Five9GetAgents($sAPI, $sUser, $sPassword)
 
 	Local $oHTTP = ObjCreate("WinHttp.WinHttpRequest.5.1")
 
-	$oHTTP.Open("GET", $sAPI & "agents/" , False)
+	$oHTTP.Open("GET", $sAPI & "agents/", False)
 	If @error Then Return SetError(1, @extended, @error)
 
 	$oHTTP.SetCredentials($sUser, $sPassword, 0)
@@ -246,7 +246,7 @@ Func _Five9GetAgents($sAPI, $sUser, $sPassword)
 
 	Return SetError(0, 0, $oHTTP.ResponseText)
 
-EndFunc
+EndFunc   ;==>_Five9GetAgents
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _Five9Logout
@@ -290,13 +290,13 @@ Func _Five9Logout($sAPI, $sUser, $sPassword)
 
 	$oHTTP.SetCredentials($sUser, $sPassword, 0)
 
-;	$oHTTP.SetRequestHeader("Content-Type", "application/xml")
+	;	$oHTTP.SetRequestHeader("Content-Type", "application/xml")
 
-;	$oHTTP.Send("<User><state>LOGOUT</state></User>")
-;	If @error Then Return SetError(2, 0, 0)
+	;	$oHTTP.Send("<User><state>LOGOUT</state></User>")
+	;	If @error Then Return SetError(2, 0, 0)
 
 	If $oHTTP.Status <> $FIVE9_STATUS_SUCCESS Then Return SetError($oHTTP.Status, 0, $oHTTP.ResponseText)
 
 	Return SetError(0, 0, True)
 
-EndFunc
+EndFunc   ;==>_Five9Logout
